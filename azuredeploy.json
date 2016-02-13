@@ -1,0 +1,262 @@
+{
+    "$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "hostingPlanName": {
+            "type": "string"
+        },
+        "siteLocation": {
+            "type": "string"
+        },
+        "sku": {
+            "type": "string",
+            "allowedValues": [
+                "Free",
+                "Shared",
+                "Basic",
+                "Standard"
+            ],
+            "defaultValue": "Free"
+        },
+        "workerSize": {
+            "type": "string",
+            "allowedValues": [
+                "0",
+                "1",
+                "2"
+            ],
+            "defaultValue": "0"
+        },
+        "siteName": {
+            "type": "string"
+        },
+        "sqlServerName": {
+            "type": "string"
+        },
+        "sqlServerAdminLogin": {
+            "type": "string"
+        },
+        "sqlServerAdminPassword": {
+            "type": "securestring"
+        },
+		"repoUrl": {
+			"type": "string"
+		},
+		"branch": {
+			"type": "string"
+		},
+        "sqlDbName": {
+            "type": "string"
+        },
+        "sqlDbCollation": {
+            "type": "string",
+            "defaultValue": "SQL_Latin1_General_CP1_CI_AS"
+        },
+        "sqlDbEdition": {
+            "type": "string",
+            "defaultValue": "Web",
+            "allowedValues": [
+                "Basic",
+                "Business",
+                "Premium",
+                "Standard",
+                "Web"
+            ]
+        },
+        "sqlDbImportStorageKeyType": {
+            "type": "string"
+        },
+        "sqlDbImportStorageKey": {
+            "type": "securestring"
+        },
+        "sqlDbImportStorageUri": {
+            "type": "string"
+        },
+        "sqlDbImportAdministratorLogin": {
+            "type": "string"
+        },
+        "sqlDbImportAdministratorLoginPassword": {
+            "type": "securestring"
+        },
+        "MCStorageName": {
+            "type": "string"
+        },
+        "MCStorageType": {
+            "type": "string",
+            "defaultValue": "Standard_LRS",
+            "allowedValues": [
+                "Standard_LRS",
+                "Standard_GRS",
+                "Standard_ZRS"
+            ]
+        },
+        "MCStorageLocation": {
+            "type": "string",
+            "defaultValue": "Australia East",
+            "allowedValues": [
+			    "Australia East",
+                "East US",
+                "West US",
+                "West Europe",
+                "East Asia",
+                "South East Asia"
+            ]
+        }
+    },
+    "variables": {
+    },
+    "resources": [
+        {
+            "name": "[parameters('hostingPlanName')]",
+            "type": "Microsoft.Web/serverfarms",
+            "location": "[parameters('siteLocation')]",
+            "apiVersion": "2014-06-01",
+            "dependsOn": [ ],
+            "tags": {
+                "displayName": "MCPlan"
+            },
+            "properties": {
+                "name": "[parameters('hostingPlanName')]",
+                "sku": "[parameters('sku')]",
+                "workerSize": "[parameters('workerSize')]",
+                "numberOfWorkers": 1
+            }
+        },
+        {
+            "name": "[parameters('siteName')]",
+            "type": "Microsoft.Web/sites",
+            "location": "[parameters('siteLocation')]",
+            "apiVersion": "2014-06-01",
+            "dependsOn": [
+                "[concat('Microsoft.Web/serverfarms/', parameters('hostingPlanName'))]"
+            ],
+            "tags": {
+                "[concat('hidden-related:', resourceGroup().id, '/providers/Microsoft.Web/serverfarms/', parameters('hostingPlanName'))]": "Resource",
+                "displayName": "MCWebApp"
+            },
+            "properties": {
+                "name": "[parameters('siteName')]",
+                "serverFarm": "[parameters('hostingPlanName')]"
+            },
+      "resources": [
+        {
+          "apiVersion": "2014-04-01",
+          "type": "config",
+          "name": "web",
+          "dependsOn": [
+            "[concat('Microsoft.Web/Sites/', parameters('siteName'))]"
+          ],
+          "properties": {
+            "connectionStrings": [
+              {
+                "ConnectionString": "[concat('Data Source=tcp:', reference(concat('Microsoft.Sql/servers/', parameters('sqlServerName'))).fullyQualifiedDomainName, ',1433;Initial Catalog=', parameters('sqlDbName'), ';User Id=', parameters('sqlServerAdminLogin'), '@', parameters('sqlServerName'), ';Password=', parameters('sqlServerAdminPassword'), ';')]",
+                "Name": "MCConnection",
+                "Type": 2
+              }
+            ],
+			"appSettings": [ 
+             { "Name": "STORAGE_URL", "Value": "http://www.storageConnection.net/api/v2/" } 
+            ] 
+          }
+        },
+        {
+          "apiVersion": "2014-04-01",
+          "name": "web",
+          "type": "sourcecontrols",
+          "dependsOn": [
+            "[resourceId('Microsoft.Web/Sites', parameters('siteName'))]",
+            "[concat('Microsoft.Web/Sites/', parameters('siteName'), '/config/web')]"
+          ],
+          "properties": {
+            "RepoUrl": "[parameters('repoUrl')]",
+            "branch": "[parameters('branch')]",
+            "IsManualIntegration": true
+          }
+        }
+      ]			
+        },
+        {
+            "name": "[parameters('sqlServerName')]",
+            "type": "Microsoft.Sql/servers",
+            "location": "[parameters('siteLocation')]",
+            "apiVersion": "2014-04-01-preview",
+            "dependsOn": [ ],
+            "tags": {
+                "displayName": "MCSQLServer"
+            },
+            "properties": {
+                "administratorLogin": "[parameters('sqlServerAdminLogin')]",
+                "administratorLoginPassword": "[parameters('sqlServerAdminPassword')]"
+            },
+            "resources": [
+                {
+                    "name": "AllowAllWindowsAzureIps",
+                    "type": "firewallrules",
+                    "location": "[parameters('siteLocation')]",
+                    "apiVersion": "2014-04-01-preview",
+                    "dependsOn": [
+                        "[concat('Microsoft.Sql/servers/', parameters('sqlServerName'))]"
+                    ],
+                    "properties": {
+                        "startIpAddress": "0.0.0.0",
+                        "endIpAddress": "0.0.0.0"
+                    }
+                },
+                {
+                    "name": "[parameters('sqlDbName')]",
+                    "type": "databases",
+                    "location": "[parameters('siteLocation')]",
+                    "apiVersion": "2014-04-01-preview",
+                    "dependsOn": [
+                        "[parameters('sqlServerName')]"
+                    ],
+                    "tags": {
+                        "displayName": "sqlDb"
+                    },
+                    "properties": {
+                        "collation": "[parameters('sqlDbCollation')]",
+                        "edition": "[parameters('sqlDbEdition')]",
+                        "maxSizeBytes": "1073741824"
+                    },
+                    "resources": [
+                        {
+                            "name": "Import",
+                            "type": "extensions",
+                            "apiVersion": "2014-04-01-preview",
+                            "dependsOn": [
+                                "[parameters('sqlDbName')]"
+                            ],
+                            "tags": {
+                                "displayName": "sqlDbImport"
+                            },
+                            "properties": {
+                                "storageKeyType": "[parameters('sqlDbImportStorageKeyType')]",
+                                "storageKey": "[parameters('sqlDbImportStorageKey')]",
+                                "storageUri": "[parameters('sqlDbImportStorageUri')]",
+                                "administratorLogin": "[parameters('sqlDbImportAdministratorLogin')]",
+                                "administratorLoginPassword": "[parameters('sqlDbImportAdministratorLoginPassword')]",
+                                "operationMode": "Import"
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "[parameters('MCStorageName')]",
+            "type": "Microsoft.Storage/storageAccounts",
+            "location": "[parameters('MCStorageLocation')]",
+            "apiVersion": "2015-05-01-preview",
+            "dependsOn": [ ],
+            "tags": {
+                "displayName": "MCStorage"
+            },
+            "properties": {
+                "accountType": "[parameters('MCStorageType')]"
+            }
+        }
+    ],
+    "outputs": {
+    }
+}
+
