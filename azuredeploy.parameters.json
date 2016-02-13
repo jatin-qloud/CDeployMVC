@@ -3,7 +3,7 @@
   "contentVersion": "1.0.0.0",
   "parameters": {
     "siteName": {
-      "value": "GEN-UNIQUE"
+      "value": "jatin"
     },
     "hostingPlanName": {
       "value": "GEN-UNIQUE"
